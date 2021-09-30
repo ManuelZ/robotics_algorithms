@@ -146,8 +146,8 @@ class EPuckNode(Node):
         line between the origin and target. The returned points' coordinates are int-indexes 
         of the map 2D array.
         
-        Based on the Bresenham's line algorithm:
-        https://en.wikipedia.org/wiki/Bresenham's_line_algorithm#All_cases
+        Based on the Bresenham's line algorithm, pag 13:
+        http://members.chello.at/~easyfilter/Bresenham.pdf 
         """
         
         x0, y0 = self.__odom_coords_to_2d_array(origin.point.x, origin.point.y)
@@ -163,20 +163,16 @@ class EPuckNode(Node):
 
         perceptual_range = []
         while True:
-            if (np.abs(x0) >= FLOOR_SIZE_X*RESOLUTION) or (np.abs(y0) >= FLOOR_SIZE_Y*RESOLUTION):
-                print(f"Skipping point due to map overflow: ({x0}, {y0})")
-                break
             perceptual_range.append((x0, y0))
-            if (x0 == x1 and y0 == y1):
-                break
-
             e2 = 2 * err
 
             if (e2 >= dy):
+                if (x0 == x1): break
                 err += dy
                 x0 += sx
             
             if (e2 <= dx):
+                if (y0 == y1): break
                 err += dx
                 y0 += sy
         
