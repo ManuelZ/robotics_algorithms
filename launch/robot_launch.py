@@ -14,7 +14,7 @@ def generate_launch_description():
     world               = LaunchConfiguration('world', default='webots_world_file.wbt')
     robot_description   = pathlib.Path(os.path.join(package_dir, 'resource', 'webots_robot_description.urdf')).read_text()
     ros2_control_params = os.path.join(package_dir, 'resource', 'ros2control.yaml')
-
+    rviz_config         = os.path.join(package_dir, 'resource', 'config.rviz')
     
 
     # The WebotsLauncher is a Webots custom action that allows you to start a Webots simulation instance.
@@ -71,7 +71,7 @@ def generate_launch_description():
     )
 
     controller_manager_timeout = ['--controller-manager-timeout', '50'] if os.name == 'nt' else []
-    controller_manager_prefix = 'python.exe' if os.name == 'nt' else "bash -c 'sleep 10; $0 $@' "
+    controller_manager_prefix  = 'python.exe' if os.name == 'nt' else "bash -c 'sleep 10; $0 $@' "
 
     diffdrive_controller_spawner = Node(
         package    = 'controller_manager',
@@ -98,6 +98,16 @@ def generate_launch_description():
         ],
     )
 
+    nav_rviz = Node(
+        package    = 'rviz2',
+        executable = 'rviz2',
+        output     = 'screen',
+        arguments  = ['-d', rviz_config],
+        parameters = [{
+            'use_sim_time': use_sim_time
+        }]
+    )
+
     # Standard ROS 2 launch description
     return launch.LaunchDescription([
 
@@ -115,6 +125,8 @@ def generate_launch_description():
         footprint_publisher,
 
         occupancy_grid,
+
+        nav_rviz,
 
         # This action will kill all nodes once the Webots simulation has exited
         launch.actions.RegisterEventHandler(
