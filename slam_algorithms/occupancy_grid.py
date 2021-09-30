@@ -181,7 +181,7 @@ class EPuckNode(Node):
 
     def __process_tof(self, msg):
         
-        # To transform from the odom frame to the frame of the TOF sensor
+        # Transform measurements in the TOF frame to the odom frame
         to_frame   = 'odom'
         from_frame = msg.header.frame_id
         now        = msg.header.stamp
@@ -189,29 +189,22 @@ class EPuckNode(Node):
         # Create Point message from Range message
         laser_point = PointStamped(point=Point(x=msg.range))
         laser_point.header.frame_id = from_frame
-        laser_point.header.stamp    = now
+        laser_point.header.stamp = now
 
         # Create Point message representing the base of the TOF laser
         laser_base_point = PointStamped(point=Point())
         laser_base_point.header.frame_id = from_frame
-        laser_base_point.header.stamp    = now
+        laser_base_point.header.stamp = now
 
         try:
             tof_transform = self.tf_buffer.lookup_transform(to_frame, from_frame, now)
                        
-            laser_point_in_odom_frame      = do_transform_point(laser_point, tof_transform)
-            laser_base_point_in_odom_frame = do_transform_point(laser_base_point, tof_transform)
-
-            # print("Point in tof frame: ({:.2f}, {:.2f}); Point in odom frame: ({:.2f}, {:.2f})".format(
-            #     laser_point.point.x,
-            #     laser_point.point.y,
-            #     laser_point_in_odom_frame.point.x,
-            #     laser_point_in_odom_frame.point.y
-            # ))
+            lp_in_odom_frame      = do_transform_point(laser_point, tof_transform)
+            lp_base_in_odom_frame = do_transform_point(laser_base_point, tof_transform)
 
             perceptual_range = self.__get_perceptual_range(
-                laser_base_point_in_odom_frame, 
-                laser_point_in_odom_frame
+                lp_base_in_odom_frame, 
+                lp_in_odom_frame
             )
         
         except (LookupException, ConnectivityException, ExtrapolationException):
@@ -225,8 +218,8 @@ class EPuckNode(Node):
 
         # Mark as occupied the point returned by the laser        
         lp_in_array_x, lp_in_array_y = self.__odom_coords_to_2d_array(
-            laser_point_in_odom_frame.point.x,
-            laser_point_in_odom_frame.point.y
+            lp_in_odom_frame.point.x,
+            lp_in_odom_frame.point.y
         )
 
         self.mark_map(lp_in_array_x, lp_in_array_y, 100)
