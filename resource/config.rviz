@@ -5,6 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /TF1/Frames1
+        - /Map1
         - /Map1/Topic1
       Splitter Ratio: 0.5
     Tree Height: 348
@@ -79,6 +80,8 @@ Visualization Manager:
           Value: false
         emitter:
           Value: false
+        front ultrasonic sensor:
+          Value: true
         gyro:
           Value: false
         led0:
@@ -191,6 +194,8 @@ Visualization Manager:
               camera:
                 {}
               emitter:
+                {}
+              front ultrasonic sensor:
                 {}
               gyro:
                 {}
@@ -354,7 +359,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 4.000405788421631
+      Distance: 4.29818058013916
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
