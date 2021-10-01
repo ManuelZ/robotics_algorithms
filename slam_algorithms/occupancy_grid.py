@@ -111,7 +111,7 @@ class EPuckNode(Node):
 
     def pub_map(self, convert_logodds_to_prob=False):
         """
-
+        Publish to the an OccupancyGrid to the /map topic.
         """
         
         msg = OccupancyGrid()
@@ -208,16 +208,15 @@ class EPuckNode(Node):
 
         try:
             tof_transform = self.tf_buffer.lookup_transform(to_frame, from_frame, now)
-                       
             lp_in_odom_frame      = do_transform_point(laser_point, tof_transform)
             lp_base_in_odom_frame = do_transform_point(laser_base_point, tof_transform)
 
-            perceptual_range = self.__get_perceptual_range(
-                lp_base_in_odom_frame, 
-                lp_in_odom_frame
-            )
         except (LookupException, ConnectivityException, ExtrapolationException):
             return
+
+        perceptual_range = self.__get_perceptual_range(
+            lp_base_in_odom_frame, lp_in_odom_frame
+        )
 
         for i, (ix,iy) in enumerate(perceptual_range):
             p = self.inverse_range_sensor_model(i, len(perceptual_range))
