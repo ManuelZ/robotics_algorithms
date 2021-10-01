@@ -24,6 +24,12 @@ Assumptions:
 ros2 launch slam_algorithms occupancy_grid.launch.py
 ```
 
+
+https://user-images.githubusercontent.com/115771/135679171-4af113ba-7d0b-4191-a51b-ad157c6f1fe4.mp4
+
+
+
+
 References
 - Sebastian Thrun - *Probabilistic Robotics*
 - Cyrill Stachniss - *Occupancy Grid Maps* https://www.youtube.com/watch?v=v-Rm9TUG9LA
