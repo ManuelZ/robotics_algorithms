@@ -7,15 +7,22 @@ Here I intend to implement mapping and localization algorithms related to SLAM. 
 My own implementation in Python of the probabilistic Occupancy Grid mapping Algorithm found in *Probabilistic Robotics* of Sebastian Thrun. 
 The space is discretized in a grid where each cell is a random variable with a probability of being occupied. 
 
+Implementation details:
+- The map grid is stored as a 2D Numpy array where each cell stores a log(odds) value.
+- The map is published to the `/map` topic at 1Hz; the log(odds) are converted to probabilities before the publishing.
+- The Bresenham's line algorithm is used to get a list of cells traversed at each laser measurement
+- The inverse range sensor model returns predefined probabilities of cell occupation for each of the cells traversed by the laser
+- The cell that is farthest away from the laser base gets a high probability of being occupied, al the other cells get a low probability value.
+
 Assumptions:
 - Grid cells are either free or occupied
 - The world is static
 - The random variables of the cells are independent of each other
 
 ### How to run
-"""
+```
 ros2 launch slam_algorithms occupancy_grid.launch.py
-"""
+```
 
 References
 - Sebastian Thrun - *Probabilistic Robotics*
