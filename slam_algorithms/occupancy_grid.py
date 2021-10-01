@@ -1,4 +1,5 @@
-from math import pi
+from math import log, pi
+import scipy.stats
 import numpy as np
 import rclpy
 from tf2_ros import StaticTransformBroadcaster
@@ -19,7 +20,10 @@ from slam_algorithms.utils import do_transform_point, prob_to_log_odds, log_odds
 FLOOR_SIZE_X = 3 # meters
 FLOOR_SIZE_Y = 3 # meters
 RESOLUTION = 100
-PRIOR_P = 0.5
+
+PRIOR_PROB = 0.5
+OCC_PROB   = 0.8
+FREE_PROB  = 0.2
 
 WORLD_ORIGIN_X = - FLOOR_SIZE_X / 2.0
 WORLD_ORIGIN_Y = - FLOOR_SIZE_Y / 2.0
@@ -35,7 +39,7 @@ class EPuckNode(Node):
         super().__init__('epuck_node')
         self.get_logger().info("Epuck node has been started.")
 
-        self.__subscriber_tof = self.create_subscription(Range, '/tof', self.__process_tof, 1)
+        self.create_subscription(Range, '/tof', self.__process_tof, 1)
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -61,15 +65,18 @@ class EPuckNode(Node):
         tf.transform.translation.z = 0.0
         self.tf_publisher.sendTransform(tf)
 
-        self.__generate_map()
-        self.pub_map()
-        self.create_timer(1, self.pub_map)
+        self.map = self.__generate_map(logodds=USE_PROBABILITIES)
+        self.pub_map(convert_logodds_to_prob=True)
+        self.create_timer(1, partial(self.pub_map, convert_logodds_to_prob=USE_PROBABILITIES), clock=self.get_clock())
 
 
-    def __generate_map(self):
+    def __generate_map(self, logodds=False):
         """
         Initialize map in odom frame. The map will have an odd size in the x and
         y directions.
+
+        Arguments
+        logodds: Whether to initialize the map with logodds or not
         """
 
         map_size_x = int(FLOOR_SIZE_X * RESOLUTION)
@@ -78,12 +85,51 @@ class EPuckNode(Node):
         map_size_y = int(FLOOR_SIZE_Y * RESOLUTION)
         self.map_size_y = map_size_y if (map_size_y % 2) == 0 else map_size_y + 1
 
-        self.map = -1 * np.ones( (self.map_size_x, self.map_size_y), dtype=np.int8)
+        map = -1 * np.ones( (self.map_size_x, self.map_size_y))
+        self.get_logger().info(f"Map size: {map.shape}")
+        
+        if logodds:
+            for ix,iy in np.ndindex(map.shape):
+                map[ix, iy] = prob_to_log_odds(PRIOR_PROB)
 
-        self.get_logger().info(f"Map size: {self.map.shape}")
+        return map
     
-        #for ix,iy in np.ndindex(self.map.shape):
-        #    self.map[ix, iy] = prob_to_log_odds(PRIOR_P)
+
+    def mark_map(self, ix, iy, value):
+        try:
+            self.map[ix,iy] = value
+        except Exception as e:
+            print(f"Problem when marking map: {e}")
+    
+
+    def get_map_val(self, ix, iy):
+        try:
+            return self.map[ix, iy]
+        except Exception as e:
+            print(f"Problem when querying map: {e}")
+
+
+    def pub_map(self, convert_logodds_to_prob=False):
+        """
+
+        """
+        
+        msg = OccupancyGrid()
+        msg.header.stamp    = self.get_clock().now().to_msg()
+        msg.header.frame_id = 'map'
+        msg.info.resolution = 1 / RESOLUTION
+        msg.info.width  = self.map_size_x
+        msg.info.height = self.map_size_y
+        msg.info.origin.position.x = WORLD_ORIGIN_X
+        msg.info.origin.position.y = WORLD_ORIGIN_Y
+        
+        map = np.copy(self.map)
+        if convert_logodds_to_prob:
+            map = log_odds_to_prob(map)
+            map = linear_mapping_of_values(map)
+
+        msg.data = map.astype(int).T.reshape(map.size, order='C').tolist() # row-major order
+        self.map_publisher.publish(msg)
 
 
     def __odom_coords_to_2d_array(self, x, y):
@@ -99,10 +145,10 @@ class EPuckNode(Node):
         
         """
         
-        x = int(x * RESOLUTION) + self.map_size_x // 2
-        y = int(y * RESOLUTION) + self.map_size_y // 2
-        return (x, y)
-
+        ix = int(x * RESOLUTION) + self.map_size_x // 2
+        iy = int(y * RESOLUTION) + self.map_size_y // 2
+        return (ix, iy)
+        
 
     def __get_perceptual_range(self, origin, target):
         """
@@ -170,56 +216,23 @@ class EPuckNode(Node):
                 lp_base_in_odom_frame, 
                 lp_in_odom_frame
             )
-        
         except (LookupException, ConnectivityException, ExtrapolationException):
             return
 
-        # Mark as empty all cells in the laser range
-        for ix,iy in perceptual_range:
-            self.mark_map(ix, iy, 0)
-            # z = inverse_range_sensor_model()
-            # self.map[cell] = self.map[cell] + prob_to_log_odds(z) - prob_to_log_odds(PRIOR_P)
-
-        # Mark as occupied the point returned by the laser        
-        lp_in_array_x, lp_in_array_y = self.__odom_coords_to_2d_array(
-            lp_in_odom_frame.point.x,
-            lp_in_odom_frame.point.y
-        )
-
-        self.mark_map(lp_in_array_x, lp_in_array_y, 100)
+        for i, (ix,iy) in enumerate(perceptual_range):
+            p = self.inverse_range_sensor_model(i, len(perceptual_range))
+            l_prev = self.get_map_val(ix, iy)
+            if l_prev is None: continue
+            l = l_prev + prob_to_log_odds(p) - prob_to_log_odds(PRIOR_PROB)    
+            self.mark_map(ix, iy, l)
 
 
-    def mark_map(self, ix, iy, value):
-        try:
-            self.map[ix,iy] = value
-        except Exception as e:
-            print(f"Problem when marking map: {e}")
-    
-    def pub_map(self):
-        msg = OccupancyGrid()
-        msg.header.stamp    = self.get_clock().now().to_msg()
-        msg.header.frame_id = 'map'
-        msg.info.resolution = 1 / RESOLUTION
-        msg.info.width  = self.map_size_x
-        msg.info.height = self.map_size_y
-        msg.info.origin.position.x = WORLD_ORIGIN_X
-        msg.info.origin.position.y = WORLD_ORIGIN_Y
-        msg.data = self.map.T.reshape(self.map.size, order='C').tolist() # row-major order
-        
-        self.map_publisher.publish(msg)
-
-
-def inverse_range_sensor_model(range, x, y, theta):
-    """
-    Specifies the probability of occupancy of the grid cell m_(x,y) conditioned on the measurement z.
-    z is the measurement of the sensor at time t, along with the pose at which the measurement was taken.
-    
-    "For example, zt might be a sonar scan and a three-dimensional pose variable (x-y coordinates of the robot and heading direction)."
-    
-    https://www.cs.cmu.edu/~thrun/papers/thrun.occ-journal.pdf
-    """
-    alpha = 0
-    beta = 0
+    def inverse_range_sensor_model(self, i, len_perceptual_range):
+        """
+        Specifies the probability of occupancy of the grid cell m_(x,y) conditioned on the measurement z.
+        This is a naive implementation.
+        """
+        return OCC_PROB if i == (len_perceptual_range - 1) else FREE_PROB 
 
 
 def main(args=None):
