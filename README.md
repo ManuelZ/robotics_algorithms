@@ -24,10 +24,9 @@ Assumptions:
 ros2 launch slam_algorithms occupancy_grid.launch.py
 ```
 
+### Demonstration
 
-https://user-images.githubusercontent.com/115771/135679171-4af113ba-7d0b-4191-a51b-ad157c6f1fe4.mp4
-
-
+https://user-images.githubusercontent.com/115771/135700503-e6f52e58-f373-4586-a083-945de13c70a8.mp4
 
 
 References
