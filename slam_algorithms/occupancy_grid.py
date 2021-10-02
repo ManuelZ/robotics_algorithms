@@ -45,11 +45,6 @@ PRIOR_PROB = 0.5
 OCC_PROB   = 0.8
 FREE_PROB  = 0.2
 
-OUT_OF_RANGE = 0.0
-TOF_MAX_RANGE = 2.0
-
-USE_PROBABILITIES = True
-
 
 class EPuckNode(Node):
     def __init__(self):
@@ -93,34 +88,25 @@ class EPuckNode(Node):
             )
         ) 
 
-        self.map = self.__generate_map(logodds=USE_PROBABILITIES)
-        self.pub_map(convert_logodds_to_prob=True)
-        self.create_timer(1, partial(
-            self.pub_map,
-            convert_logodds_to_prob=USE_PROBABILITIES
-        ), clock=self.get_clock())
+        self.map = self.__generate_map()
+        self.pub_map()
+        self.create_timer(1, self.pub_map, clock=self.get_clock())
 
 
-    def __generate_map(self, logodds=False):
+    def __generate_map(self):
         """
-        Initialize map in the odom frame. The map will have an odd size in the x and
-        y directions.
-
-        Arguments
-        logodds: Whether to initialize the map with logodds or not
+        Initialize map in the odom frame.
         """
-
-        map = -1 * np.ones( (MAP_SIZE_X, MAP_SIZE_Y))
+        map = prob_to_log_odds(PRIOR_PROB) * np.ones( (MAP_SIZE_X, MAP_SIZE_Y))
         self.get_logger().info(f"Map size: {map.shape}")
-        
-        if logodds:
-            for ix,iy in np.ndindex(map.shape):
-                map[ix, iy] = prob_to_log_odds(PRIOR_PROB)
-
         return map
     
 
     def mark_map(self, ix, iy, value):
+        """
+        Update a map's cell value.
+        """
+        
         try:
             self.map[ix,iy] = value
         except Exception as e:
@@ -128,24 +114,24 @@ class EPuckNode(Node):
     
 
     def get_map_val(self, ix, iy):
+        """
+        Get a map's cell value.
+        """
         try:
             return self.map[ix, iy]
         except Exception as e:
             print(f"Problem when querying map: {e}")
 
 
-    def pub_map(self, convert_logodds_to_prob=False):
+    def pub_map(self):
         """
-        Publish to the an OccupancyGrid to the /map topic.
+        Publish an OccupancyGrid to the /map topic.
         """
+        
+        map = log_odds_to_prob(self.map)
+        map = linear_mapping_of_values(map) # To visualize in Rviz
 
         self.occupancy_grid_msg.header.stamp = self.get_clock().now().to_msg()
-        
-        map = np.copy(self.map)
-        if convert_logodds_to_prob:
-            map = log_odds_to_prob(map)
-            map = linear_mapping_of_values(map)
-
         self.occupancy_grid_msg.data = map.astype(int).T.reshape(map.size, order='C').tolist() # row-major order
         self.map_publisher.publish(self.occupancy_grid_msg)
 
@@ -165,14 +151,14 @@ class EPuckNode(Node):
         
         ix = int(x / RESOLUTION) + MAP_SIZE_X // 2
         iy = int(y / RESOLUTION) + MAP_SIZE_Y // 2
+        
         return (ix, iy)
         
 
     def __get_perceptual_range(self, origin, target):
         """
-        Get the grid cells that belong to the
-        line between the origin and target. The returned points' coordinates are int-indexes 
-        of the map 2D array.
+        Get the grid cells that belong to the line between the origin and target.
+         The returned points' coordinates are int-indexes of the map 2D array.
         
         Based on the Bresenham's line algorithm, pag 13:
         http://members.chello.at/~easyfilter/Bresenham.pdf 
@@ -208,6 +194,9 @@ class EPuckNode(Node):
 
 
     def __process_tof(self, msg):
+        """
+        Process a new TOF laser message and update map.
+        """
        
         # Transform measurements in the TOF frame to the odom frame
         to_frame   = 'odom'
