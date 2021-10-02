@@ -1,20 +1,33 @@
-from math import log, pi
-import scipy.stats
+# Standard library imports
+from functools import partial
+import time
+
+# External imports
 import numpy as np
 import rclpy
-from tf2_ros import StaticTransformBroadcaster
-from sensor_msgs.msg import LaserScan, Range
-from geometry_msgs.msg import TransformStamped, Point, PointStamped, PoseStamped, Pose
 from rclpy.node import Node
-from functools import partial
-from nav_msgs.msg import Odometry
+from rclpy.qos import DurabilityPolicy
+from rclpy.qos import HistoryPolicy
+from rclpy.qos import QoSProfile
 from tf2_ros.buffer import Buffer
+from tf2_ros import StaticTransformBroadcaster
 from tf2_ros import TransformListener
-from tf2_ros import LookupException, ConnectivityException
+from tf2_ros import LookupException
+from tf2_ros import ConnectivityException
 from tf2_ros import ExtrapolationException
+from sensor_msgs.msg import Range
+from geometry_msgs.msg import TransformStamped
+from geometry_msgs.msg import Point
+from geometry_msgs.msg import PointStamped
+from geometry_msgs.msg import Pose
 from nav_msgs.msg import OccupancyGrid
-from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile
-from slam_algorithms.utils import do_transform_point, prob_to_log_odds, log_odds_to_prob, linear_mapping_of_values
+from nav_msgs.msg import MapMetaData
+
+# Local imports
+from slam_algorithms.utils import do_transform_point
+from slam_algorithms.utils import prob_to_log_odds
+from slam_algorithms.utils import log_odds_to_prob
+from slam_algorithms.utils import linear_mapping_of_values
 
 
 FLOOR_SIZE_X = 3 # meters
@@ -163,7 +176,7 @@ class EPuckNode(Node):
         x0, y0 = self.__odom_coords_to_2d_array(origin.point.x, origin.point.y)
         x1, y1 = self.__odom_coords_to_2d_array(target.point.x, target.point.y)
         
-        dx =  np.abs(x1 - x0)
+        dx = np.abs(x1 - x0)
         sx = 1 if (x0 < x1) else -1
         
         dy = -np.abs(y1 - y0)
