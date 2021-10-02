@@ -30,16 +30,20 @@ from slam_algorithms.utils import log_odds_to_prob
 from slam_algorithms.utils import linear_mapping_of_values
 
 
-FLOOR_SIZE_X = 3 # meters
+# double the actual world size to let it drift
+FLOOR_SIZE_X = 3 # meters, 
 FLOOR_SIZE_Y = 3 # meters
-RESOLUTION = 100
+RESOLUTION = 0.01 # meters per cell
+
+WORLD_ORIGIN_X = -FLOOR_SIZE_X / 2.0
+WORLD_ORIGIN_Y = -FLOOR_SIZE_Y / 2.0
+
+MAP_SIZE_X = int(FLOOR_SIZE_X / RESOLUTION)
+MAP_SIZE_Y = int(FLOOR_SIZE_Y / RESOLUTION)
 
 PRIOR_PROB = 0.5
 OCC_PROB   = 0.8
 FREE_PROB  = 0.2
-
-WORLD_ORIGIN_X = - FLOOR_SIZE_X / 2.0
-WORLD_ORIGIN_Y = - FLOOR_SIZE_Y / 2.0
 
 OUT_OF_RANGE = 0.0
 TOF_MAX_RANGE = 2.0
@@ -78,27 +82,35 @@ class EPuckNode(Node):
         tf.transform.translation.z = 0.0
         self.tf_publisher.sendTransform(tf)
 
+        self.occupancy_grid_msg = OccupancyGrid()
+        self.occupancy_grid_msg.header.frame_id = 'map'       
+        self.occupancy_grid_msg.info = MapMetaData(
+            width      = MAP_SIZE_X,
+            height     = MAP_SIZE_Y,
+            resolution = RESOLUTION,
+            origin     = Pose(
+                position = Point(x = WORLD_ORIGIN_X, y = WORLD_ORIGIN_Y)
+            )
+        ) 
+
         self.map = self.__generate_map(logodds=USE_PROBABILITIES)
         self.pub_map(convert_logodds_to_prob=True)
-        self.create_timer(1, partial(self.pub_map, convert_logodds_to_prob=USE_PROBABILITIES), clock=self.get_clock())
+        self.create_timer(1, partial(
+            self.pub_map,
+            convert_logodds_to_prob=USE_PROBABILITIES
+        ), clock=self.get_clock())
 
 
     def __generate_map(self, logodds=False):
         """
-        Initialize map in odom frame. The map will have an odd size in the x and
+        Initialize map in the odom frame. The map will have an odd size in the x and
         y directions.
 
         Arguments
         logodds: Whether to initialize the map with logodds or not
         """
 
-        map_size_x = int(FLOOR_SIZE_X * RESOLUTION)
-        self.map_size_x = map_size_x if (map_size_x % 2) == 0 else map_size_x + 1
-        
-        map_size_y = int(FLOOR_SIZE_Y * RESOLUTION)
-        self.map_size_y = map_size_y if (map_size_y % 2) == 0 else map_size_y + 1
-
-        map = -1 * np.ones( (self.map_size_x, self.map_size_y))
+        map = -1 * np.ones( (MAP_SIZE_X, MAP_SIZE_Y))
         self.get_logger().info(f"Map size: {map.shape}")
         
         if logodds:
@@ -126,23 +138,16 @@ class EPuckNode(Node):
         """
         Publish to the an OccupancyGrid to the /map topic.
         """
-        
-        msg = OccupancyGrid()
-        msg.header.stamp    = self.get_clock().now().to_msg()
-        msg.header.frame_id = 'map'
-        msg.info.resolution = 1 / RESOLUTION
-        msg.info.width  = self.map_size_x
-        msg.info.height = self.map_size_y
-        msg.info.origin.position.x = WORLD_ORIGIN_X
-        msg.info.origin.position.y = WORLD_ORIGIN_Y
+
+        self.occupancy_grid_msg.header.stamp = self.get_clock().now().to_msg()
         
         map = np.copy(self.map)
         if convert_logodds_to_prob:
             map = log_odds_to_prob(map)
             map = linear_mapping_of_values(map)
 
-        msg.data = map.astype(int).T.reshape(map.size, order='C').tolist() # row-major order
-        self.map_publisher.publish(msg)
+        self.occupancy_grid_msg.data = map.astype(int).T.reshape(map.size, order='C').tolist() # row-major order
+        self.map_publisher.publish(self.occupancy_grid_msg)
 
 
     def __odom_coords_to_2d_array(self, x, y):
@@ -150,16 +155,16 @@ class EPuckNode(Node):
         Transform a coord in the odom frame to coords in a 2D array.
         
         E.g.
-        resolution  = 100
+        resolution  = 0.1
         map_size_ x = 101
         map_size_ y = 101
-        (0.8, 1.1) -> 0.8 * 100 + 50, 1.1*100 + 50
+        (0.8, 1.1) -> 0.8 / 0.1 + 50, 1.1*100 + 50
                    -> (130, 160)
         
         """
         
-        ix = int(x * RESOLUTION) + self.map_size_x // 2
-        iy = int(y * RESOLUTION) + self.map_size_y // 2
+        ix = int(x / RESOLUTION) + MAP_SIZE_X // 2
+        iy = int(y / RESOLUTION) + MAP_SIZE_Y // 2
         return (ix, iy)
         
 
@@ -203,7 +208,7 @@ class EPuckNode(Node):
 
 
     def __process_tof(self, msg):
-        
+       
         # Transform measurements in the TOF frame to the odom frame
         to_frame   = 'odom'
         from_frame = msg.header.frame_id
