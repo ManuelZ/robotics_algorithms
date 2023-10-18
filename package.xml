@@ -4,7 +4,7 @@
   <name>robotics_algorithms</name>
   <version>0.0.1</version>
   <description>TODO: Package description</description>
-  <maintainer email="">manuel</maintainer>
+  <maintainer email="115771+ManuelZ@users.noreply.github.com">manuel</maintainer>
   <license>TODO: License declaration</license>
 
   <exec_depend>rclpy</exec_depend>
