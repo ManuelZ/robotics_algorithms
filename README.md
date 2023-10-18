@@ -20,8 +20,15 @@ Assumptions:
 - The random variables of the cells are independent of each other
 
 ### How to run
+
+In Windows follow [this guide](https://docs.ros.org/en/humble/Tutorials/Advanced/Simulators/Webots/Installation-Windows.html), which explains how to install ROS2 and `webots_ros2` in WSL2 while running Webots from the host, using the `WEBOTS_HOME=/mnt/c/Program\ Files/Webots` Linux environment variable as mentioned in the guide.
+
+Then, whether in WSL2 or in native Linux, build the package and run the code:
 ```
-ros2 launch slam_algorithms occupancy_grid.launch.py
+cd /ros2_ws
+colcon build
+source /ros2_ws/install/setup.bash
+ros2 launch robotics_algorithms occupancy_grid.launch.py
 ```
 
 ### Demonstration
