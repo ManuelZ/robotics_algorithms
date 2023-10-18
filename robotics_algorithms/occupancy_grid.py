@@ -24,10 +24,10 @@ from nav_msgs.msg import OccupancyGrid
 from nav_msgs.msg import MapMetaData
 
 # Local imports
-from slam_algorithms.utils import do_transform_point
-from slam_algorithms.utils import prob_to_log_odds
-from slam_algorithms.utils import log_odds_to_prob
-from slam_algorithms.utils import linear_mapping_of_values
+from robotics_algorithms.utils import do_transform_point
+from robotics_algorithms.utils import prob_to_log_odds
+from robotics_algorithms.utils import log_odds_to_prob
+from robotics_algorithms.utils import linear_mapping_of_values
 
 
 # double the actual world size to let it drift

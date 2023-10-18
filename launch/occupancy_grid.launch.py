@@ -9,7 +9,7 @@ from webots_ros2_core.webots_launcher import WebotsLauncher
 
 
 def generate_launch_description():
-    package_dir         = get_package_share_directory('slam_algorithms')
+    package_dir         = get_package_share_directory('robotics_algorithms')
     use_sim_time        = LaunchConfiguration('use_sim_time', default=True)
     world               = LaunchConfiguration('world', default='webots_world_file.wbt')
     robot_description   = pathlib.Path(os.path.join(package_dir, 'resource', 'webots_robot_description.urdf')).read_text()
@@ -90,7 +90,7 @@ def generate_launch_description():
     )
 
     occupancy_grid = Node(
-        package    = 'slam_algorithms',
+        package    = 'robotics_algorithms',
         executable = 'occupancy_grid',
         output     = 'screen',
         parameters = [

@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'slam_algorithms'
+package_name = 'robotics_algorithms'
 
 data_files = []
 
@@ -45,7 +45,7 @@ setup(
     tests_require    = ['pytest'],
     entry_points     = {
         'console_scripts': [
-            'occupancy_grid = slam_algorithms.occupancy_grid:main'
+            'occupancy_grid = robotics_algorithms.occupancy_grid:main'
         ],
     },
 )
