@@ -1,7 +1,3 @@
-# Standard library imports
-from functools import partial
-import time
-
 # External imports
 import numpy as np
 import rclpy
@@ -22,9 +18,11 @@ from geometry_msgs.msg import PointStamped
 from geometry_msgs.msg import Pose
 from nav_msgs.msg import OccupancyGrid
 from nav_msgs.msg import MapMetaData
+from rclpy.executors import ExternalShutdownException
+from builtin_interfaces.msg import Time
+from tf2_geometry_msgs import do_transform_point
 
 # Local imports
-from robotics_algorithms.utils import do_transform_point
 from robotics_algorithms.utils import prob_to_log_odds
 from robotics_algorithms.utils import log_odds_to_prob
 from robotics_algorithms.utils import linear_mapping_of_values
@@ -51,10 +49,13 @@ class EPuckNode(Node):
         super().__init__('epuck_node')
         self.get_logger().info("Epuck node has been started.")
 
-        self.create_subscription(Range, '/tof', self.__process_tof, 1)
-
+        # Once the listener is created, it starts receiving tf2 transformations
+        # over the wire, and buffers them for up to 10 seconds
+        # https://docs.ros.org/en/humble/Tutorials/Intermediate/Tf2/Writing-A-Tf2-Listener-Py.html
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
+
+        self.create_subscription(Range, '/tof', self.__process_tof, 1)
 
         self.map_publisher = self.create_publisher(
             OccupancyGrid,
@@ -67,6 +68,9 @@ class EPuckNode(Node):
         )
 
         # A null static transform to map the 'odom' frame to the 'map' frame
+        # For details on the coordinate frames, see
+        # https://www.ros.org/reps/rep-0105.html
+        # https://www.ros.org/reps/rep-0120.html
         self.tf_publisher = StaticTransformBroadcaster(self)
         tf = TransformStamped()
         tf.header.stamp = self.get_clock().now().to_msg()
@@ -97,8 +101,8 @@ class EPuckNode(Node):
         """
         Initialize map in the odom frame.
         """
+        self.get_logger().info(f"Generating map of size: {(MAP_SIZE_X, MAP_SIZE_Y)}")
         map = prob_to_log_odds(PRIOR_PROB) * np.ones( (MAP_SIZE_X, MAP_SIZE_Y))
-        self.get_logger().info(f"Map size: {map.shape}")
         return map
     
 
@@ -158,7 +162,7 @@ class EPuckNode(Node):
     def __get_perceptual_range(self, origin, target):
         """
         Get the grid cells that belong to the line between the origin and target.
-         The returned points' coordinates are int-indexes of the map 2D array.
+        The returned points' coordinates are int-indexes of the map 2D array.
         
         Based on the Bresenham's line algorithm, pag 13:
         http://members.chello.at/~easyfilter/Bresenham.pdf 
@@ -199,8 +203,8 @@ class EPuckNode(Node):
         """
        
         # Transform measurements in the TOF frame to the odom frame
-        to_frame   = 'odom'
         from_frame = msg.header.frame_id
+        to_frame   = 'odom'
         now        = msg.header.stamp
         
         # Create Point message from Range message
@@ -214,11 +218,12 @@ class EPuckNode(Node):
         laser_base_point.header.stamp = now
 
         try:
-            tof_transform = self.tf_buffer.lookup_transform(to_frame, from_frame, now)
-            lp_in_odom_frame      = do_transform_point(laser_point, tof_transform)
+            tof_transform = self.tf_buffer.lookup_transform(to_frame, from_frame, Time(sec=0, nanosec=0))
+            lp_in_odom_frame = do_transform_point(laser_point, tof_transform)
             lp_base_in_odom_frame = do_transform_point(laser_base_point, tof_transform)
 
-        except (LookupException, ConnectivityException, ExtrapolationException):
+        except (LookupException, ConnectivityException, ExtrapolationException) as e:
+            print(f"Problem when processing TOF message: ", e)
             return
 
         perceptual_range = self.__get_perceptual_range(
@@ -229,8 +234,8 @@ class EPuckNode(Node):
             p = self.inverse_range_sensor_model(i, len(perceptual_range))
             l_prev = self.get_map_val(ix, iy)
             if l_prev is None: continue
-            l = l_prev + prob_to_log_odds(p) - prob_to_log_odds(PRIOR_PROB)    
-            self.mark_map(ix, iy, l)
+            l = l_prev + prob_to_log_odds(p) - prob_to_log_odds(PRIOR_PROB)
+            self.mark_map(ix, iy, value=l)
 
 
     def inverse_range_sensor_model(self, i, len_perceptual_range):
@@ -238,20 +243,24 @@ class EPuckNode(Node):
         Specifies the probability of occupancy of the grid cell m_(x,y) conditioned on the measurement z.
         This is a naive implementation.
         """
-        return OCC_PROB if i == (len_perceptual_range - 1) else FREE_PROB 
+        if i == (len_perceptual_range - 1):
+            return OCC_PROB
+        else:
+            return FREE_PROB 
 
 
 def main(args=None):
-    rclpy.init(args=args)
-    epuck_controller = EPuckNode()
-    rclpy.spin(epuck_controller)
-
-    # Destroy the node explicitly
-    # (optional - otherwise it will be done automatically
-    # when the garbage collector destroys the node object)
-    epuck_controller.destroy_node()
-
-    rclpy.shutdown()
+    try:
+        rclpy.init(args=args)
+        epuck_controller = EPuckNode()
+        rclpy.spin(epuck_controller)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
+    finally:
+        # Destroy the node explicitly
+        # (optional - Done automatically when node is garbage collected)
+        rclpy.try_shutdown()
+        epuck_controller.destroy_node()
 
 
 if __name__ == '__main__':

@@ -23,8 +23,6 @@ data_files.append(('share/' + package_name + '/worlds', [
 ]))
 
 data_files.append(('share/' + package_name + '/protos', [
-    'protos/E-puck_enu.proto',
-    'protos/E-puckDistanceSensor_enu.proto'
 ]))
 
 data_files.append(('share/' + package_name, [
@@ -39,7 +37,7 @@ setup(
     install_requires = ['setuptools', 'launch'],
     zip_safe         = True,
     maintainer       = 'manuelz',
-    maintainer_email = '',
+    maintainer_email = '115771+ManuelZ@users.noreply.github.com',
     description      = 'TODO: Package description',
     license          = 'TODO: License declaration',
     tests_require    = ['pytest'],

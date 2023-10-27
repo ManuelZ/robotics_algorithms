@@ -31,6 +31,10 @@ source /ros2_ws/install/setup.bash
 ros2 launch robotics_algorithms occupancy_grid.launch.py
 ```
 
+```
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+```
+
 ### Demonstration
 
 https://user-images.githubusercontent.com/115771/135700503-e6f52e58-f373-4586-a083-945de13c70a8.mp4

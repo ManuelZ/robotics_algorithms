@@ -1,30 +1,33 @@
-#VRML_SIM R2022a utf8 
+#VRML_SIM R2022b utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/master/projects/robots/gctronic/e-puck/protos/E-puck.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/factory/containers/protos/WoodenBox.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackground.proto"
+
+
 WorldInfo {
   info [
     "Simple simulation that can be controlled with ROS2."
   ]
   title "ROS2 simulation"
+  basicTimeStep 20
 }
 Viewpoint {
   orientation -0.57735 0.57735 0.57735 2.09432
   position 0 0 4.4
-  follow "E-puck_enu"
+  follow "E-puck"
 }
 TexturedBackground {
 }
 TexturedBackgroundLight {
 }
-E-puck_enu {
-  translation -0.0066257 -0.0530459 0.00806403
-  rotation 1 0 0 -3.141545307179586
+E-puck {
+  translation 0 0 0
+  rotation 0 0 1 1.57
   controller "<extern>"
   version "2"
-  camera_width 640
-  camera_height 480
-  turretSlot [
-    Pi-puck {
-    }
-  ]
 }
 RectangleArena {
   rotation 0 0 0 0
